@@ -1,0 +1,48 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script type="text/javascript" src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
+    <script type="text/javascript" src="myCamera.js"></script>
+</head>
+<body>
+    <h1>Simple Video Chat</h1>
+    <div>
+        <button type="button" id="my-stream_sw" value=0>START</button><span id="my-stream_sw_message"></span>
+    </div>
+    <div>
+        <video id="my-video" style="width: 300px;" autoplay muted></video><br />
+        <button type="button" id="my-video_sw" value=0>ON </button> 
+        <input type="range" id="my-video_rate" min="0" max="30" step="1" value="5"><span id="my-video_rate_currentValue"></span>
+        
+    </div>
+    <div>
+
+        <button type="button" id="my-mic_sw" value=0>ON </button> 
+        <input type="range" id="my-microphoneLevel" value="1.0" min="0.0" max="2.0" step="0.1"><span id="my-microphoneLevel_currentValue"></span>
+        Mic <br />
+        <p>
+           <input type="checkbox" name="my-checkbox_microphoneProps" value="again">AutoGain
+           <input type="checkbox" name="my-checkbox_microphoneProps" value="noize">noiseSuppression
+        </p>
+        <p> EchoCanceler
+            <input type="radio" name="my-radio_microphoneEchoCancel" value="none"> no
+            <input type="radio" name="my-radio_microphoneEchoCancel" value="system" checked="checked"> system
+            <input type="radio" name="my-radio_microphoneEchoCancel" value="browser"> browser
+        </p>
+    
+    </div>
+    <div>
+        <input type="text" placeholder="PeerID" id="peer-id-input"><br />
+        
+        <button type="button" id="my-volume_sw" value=0>ON </button> 
+        <input type="range" id="my-volumeLevel" value="0.3" min="0.0" max="1.0" step="0.1"><span id="my-volumeLevel_currentValue"></span>
+        Volume <br />
+
+    </div>
+    
+    <textarea id="textarea_ResultRecognition" rows="4" cols="40" readonly></textarea> <br />
+    <input type="checkbox" id="my-checkbox_recordRecognition" value="again">record 
+    <span id="text_ResultRecognition_status"></span><span id="textarea_ResultRecognition_pre"></span>
+</body>
+</html>
