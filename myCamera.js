@@ -9,147 +9,42 @@ let audioTrack = null;
 let videoTrack = null;
 
 
-const c_audioContext = new AudioContext(); // chromeでは、後続のresume で有効化される
+const c_audioContext = new (window.AudioContext || window.webkitAudioContext)(); // chromeでは、後続のresume で有効化される
 const c_gainNode = c_audioContext.createGain(); // マイク音量（感度）調整用
 
 const c_elemEvent_input = new Event('input');
 
-
+let audioContextCtrls={};
 
 
 //音声認識
-window.SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition || webkitSpeechRecognition || SpeechRecognition;
+if('SpeechRecognition' in window){
+//対応
+ let i=0;
+}else{
+//非対応
+ let i=0;
+}
 
+// var SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition || webkitSpeechRecognition || SpeechRecognition;
+if(window.webkitSpeechRecognition){var SpeechRecognition = window.webkitSpeechRecognition}
+else if(window.SpeechRecognition){var SpeechRecognition = window.SpeechRecognition}
+else if(typeof webkitSpeechRecognition!=="undefined"){var SpeechRecognition = webkitSpeechRecognition}
+else if(typeof SpeechRecognition!=="undefined"){var SpeechRecognition = SpeechRecognition}
+
+if('SpeechRecognition' in window){
+//対応
+ let i=0;
+}else{
+//非対応
+ let i=0;
+}
 
 let recognition = null;
 let recognitionRestartableFlg = true;
 
-function settingRecognition(){
-  if(!('SpeechRecognition' in window)){
-      return false;
-  }else{ //音声認識の初期化
-    recognition = new SpeechRecognition();
-    if(recognition){
-        recognition.lang = 'ja-JP';
-        recognition.interimResults = true; // 暫定結果も返す
-        recognition.continuous = true;
-        
-        recognition.addEventListener('start', (event) => {
-           recognitionRestartableFlg = true;
-           elemCheckBox_ResultRecognition.checked = true;
-        })
-        recognition.addEventListener('end', (event) => {
-            addMessageOfRecognitionErr();
-            if (recognitionRestartableFlg) {
-                recognition.start();
-                recognitionRestartableFlg = false;
-                elemCheckBox_ResultRecognition.checked = false;
-                elemText_ResultRecognitionStatus.innerHTML="";
-                console.log("Recognition end(restart).");
-            }else{
-                console.log("Recognition end.");
-            }
-        })
-        recognition.addEventListener('result', (event) => {
-            let finalTranscript = ''; //確定結果
-            let interimTranscript = ''; // 暫定(灰色)の認識結果
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              let transcript = event.results[i][0].transcript;
-              if (event.results[i].isFinal) {
-                finalTranscript += transcript;
-                recognitionRestartableFlg = true;
-                console.log("Recognition final."+interimTranscript);
-                interimTranscript="";
-              } else {
-                interimTranscript = transcript;
-                recognitionRestartableFlg = false;
-              }
-            }
-            if(!recognitionRestartableFlg){
-                console.log("Recognition continue.");
-            }
-            addMessageOfRecognition(finalTranscript,interimTranscript);
-            
-        })
-        recognition.addEventListener('nomatch', (event) => {
-            addMessageOfRecognitionErr();
-            console.log("Recognition NoMatch:"+event.error);
-        })
-        recognition.addEventListener('error', (event) => {
-            addMessageOfRecognitionErr();
-            console.log("RecognitionError:"+event.error);
-        })
-        recognition.addEventListener('soundstart', (event) => {
-            elemText_ResultRecognitionStatus.innerHTML="●";
-        })
-        recognition.addEventListener('soundend', (event) => {
-            elemText_ResultRecognitionStatus.innerHTML="○";
-        })
-        
-        
-        
-        
-        
-        
-        // recognition.stop();
-        // recognition.start(); https://developer.mozilla.org/ja/docs/Web/API/SpeechRecognition
-    }
-  }
-}
-function addMessageOfRecognition(msg1,msg2){
-    let maxcount = 50; //最大文字数
-    const datetimeNow = new Date();
-    let strTime = " ("+ datetimeNow.getHours()+":"+datetimeNow.getMinutes()+")";
-    
-    if(msg1!=""){
-      if(elemTextArea_ResultRecognition){
-          let msg = elemTextArea_ResultRecognition.value;
-          msg += (strTime+msg1);
-          if(msg.length>maxcount){ msg=msg.slice( 0-maxcount ); }
-          elemTextArea_ResultRecognition.value = msg;
-      }
-    }
-    if(elemTextArea_ResultRecognitionP){
-        elemTextArea_ResultRecognitionP.innerHTML = msg2;
-    }
-}
-function addMessageOfRecognitionErr(){
-    let msg='';
-    if(elemTextArea_ResultRecognitionP){
-        msg=elemTextArea_ResultRecognitionP.innerHTML;
-        elemTextArea_ResultRecognitionP.innerHTML="";
-    }
-    addMessageOfRecognition(msg,"");
-}
 
-function buildVideoConstraintsJSON() {
-  try {
-    videoConstraints = JSON.parse(videoConstraintsText);
-  } catch(error) {
-    handleError(error);
-  }
-}
-function buildAudioConstraintsJSON() {
-  try {
-    audioConstraints = JSON.parse(audioConstraintsText);
-  } catch(error) {
-    handleError(error);
-  }
-}
-function getCurrentSettings() {
-  if (videoTrack) {
-    videoConstraintsText = JSON.stringify(videoTrack.getSettings(), null, 2);
-  }
-  if (audioTrack) {
-    audioConstraintsText = JSON.stringify(audioTrack.getSettings(), null, 2);
-  }
-}
-videoConstraintsText = '{ "width": {"max":1280}, "height": {"max":720} ,"frameRate": { "ideal": 5, "max": 10 } }';
-audioConstraintsText = '{ "sampleSize": 8, "channelCount": 1, "echoCancellation": false}';
-
-
-
-
+// ============ 初期化実行 ================
 
 // カメラ／マイクにアクセスするためのメソッドを取得しておく
 navigator.mediaDevices = navigator.mediaDevices || ((navigator.mozGetUserMedia || navigator.webkitGetUserMedia) ? {
@@ -187,10 +82,20 @@ let elemTextArea_ResultRecognition;
 let elemTextArea_ResultRecognitionP;
 let elemCheckBox_ResultRecognition;
 let elemText_ResultRecognitionStatus;
+let elemText_chatMessage;
+let elemText_chatMessage_log;
+let elemText_chatMessage_saveFN;
+let elemText_chatMessage_saveBlobLink;
 
+let elemAddNewPeer_SW;
+let elemText_myPeerId;
+let elemText_myPeerId_copySW;
+let elemDiv_streams;
 
-$(function() {
-
+document.addEventListener('DOMContentLoaded', function() {  // <<< $(function() {
+    myOnload();
+})
+function myOnload(){
   elemStream_SW =  document.getElementById('my-stream_sw');
   elemStream_SW_Msg =  document.getElementById('my-stream_sw_message');
   elemVideo = document.getElementById('my-video');
@@ -209,8 +114,22 @@ $(function() {
   elemTextArea_ResultRecognitionP= document.getElementById("textarea_ResultRecognition_pre");
   elemCheckBox_ResultRecognition = document.getElementById("my-checkbox_recordRecognition");
   elemText_ResultRecognitionStatus = document.getElementById("text_ResultRecognition_status");
+  elemText_chatMessage = document.getElementById("textarea_chatMessage-input");
+  elemText_chatMessage_SW = document.getElementById("textarea_chatMessage-input_sw");
+  elemText_chatMessage_log = document.getElementById("textarea_chatMessage-log");
+  elemText_chatMessage_saveSW = document.getElementById("textarea_chatMessage-logsave_sw");
+  elemText_chatMessage_saveBlobLink = document.getElementById("textarea_chatMessage-save_bloblink");
+  
+  
+  elemText_myPeerId = document.getElementById("my-peer-id");
+  elemText_myPeerId_copySW = document.getElementById("my-peer-id-copy_sw");
+  elemDiv_streams = document.getElementById("streams");
+  elemAddNewPeer_SW = document.getElementById("my-addNewPeer");
+  elemText_AddNewPeerID = document.getElementById("peer-id-input");
 
-
+  
+  
+  
 
   if(elemCheckBox_ResultRecognition){
     let flg=0
@@ -238,6 +157,79 @@ $(function() {
   }
   
   
+   //elemText_chatMessage_SW = document.getElementById("textarea_chatMessage-input_sw");
+   if(elemText_chatMessage_SW){
+     elemText_chatMessage_SW.addEventListener('click', function(e){
+         e.target.setAttribute("disabled", true);
+         
+         let tgtmsg;
+         if(elemText_chatMessage){
+             tgtmsg = elemText_chatMessage.value;
+             if(tgtmsg){if(tgtmsg!=""){
+                   sendNewChatMessage(tgtmsg);
+             }}
+             elemText_chatMessage.value ="";
+         }
+         
+         e.target.removeAttribute("disabled");
+     });
+   }
+
+   //  elemText_chatMessage_saveSW = document.getElementById("textarea_chatMessage-save_sw");
+   if(elemText_chatMessage_saveSW){
+     elemText_chatMessage_saveSW.addEventListener('click', function(e){
+         e.target.setAttribute("disabled", true);
+         
+         saveChatMessageLog();
+         
+         e.target.removeAttribute("disabled");
+     });
+   }
+
+   //  elemText_myPeerId_copySW = document.getElementById("my-peer-id-copy_sw");
+   if(elemText_myPeerId_copySW){
+     elemText_myPeerId_copySW.addEventListener('click', function(e){
+         e.target.setAttribute("disabled", true);
+         
+         if(elemText_myPeerId){
+             elemText_myPeerId.readOnly=false;
+             elemText_myPeerId.removeAttribute("readonly");
+             
+             elemText_myPeerId.select();
+             document.execCommand("copy"); 
+             getSelection().empty();
+             
+             elemText_myPeerId.setAttribute("readonly","");
+             elemText_myPeerId.readOnly=true;
+         }
+         
+         e.target.removeAttribute("disabled");
+     });
+   }
+
+
+
+
+
+
+   // elemAddNewPeer_SW = document.getElementById("my-addNewPeer");
+   if(elemAddNewPeer_SW){
+     elemAddNewPeer_SW.addEventListener('click', function(e){
+         e.target.setAttribute("disabled", true);
+         
+         let tgtpeerid;
+         if(elemText_AddNewPeerID){
+             tgtpeerid = elemText_AddNewPeerID.value;
+             if(tgtpeerid){
+               if(tgtpeerid!=""){
+                   addNewPeer(tgtpeerid);
+               }
+             }
+             elemText_AddNewPeerID.value ="";
+         }
+         e.target.removeAttribute("disabled");
+     });
+   }
 
    //elemStream_SW =  document.getElementById('my-stream_sw');
    //elemStream_SW_Msg =  document.getElementById('my-stream_sw_message');
@@ -246,11 +238,11 @@ $(function() {
          e.target.setAttribute("disabled", true);
          if(e.target.value!=0){
              e.target.value=0;
-             e.target.innerText = "ON";
+             e.target.innerText = "送信再開";
              if(elemStream_SW_Msg){elemStream_SW_MsginnerText="停止中";}
          }else{
              e.target.value=1;
-             e.target.innerText = "OFF";
+             e.target.innerText = "送信停止";
              if(elemStream_SW_Msg){elemStream_SW_MsginnerText="送信中";}
          }
          
@@ -269,12 +261,14 @@ $(function() {
              e.target.value=0;
              e.target.innerText = "ON";
              
-             changAbleStream(localStream.getVideoTracks(),false);//Off
+             if(localStream){if(localStream.getVideoTracks){ 
+                 changAbleStream(localStream.getVideoTracks(),false); }} //Off
          }else{
              e.target.value=1;
              e.target.innerText = "OFF";
              
-             changAbleStream(localStream.getVideoTracks(),true);//On
+             if(localStream){if(localStream.getVideoTracks){ 
+                 changAbleStream(localStream.getVideoTracks(),true); }} //On
          }
          e.target.removeAttribute("disabled");
      });
@@ -406,7 +400,142 @@ $(function() {
    
    //changeVideoConstraints();
    
-});
+   
+   startMultiparty();
+   
+}
+
+
+
+function settingRecognition(){
+  if(!('SpeechRecognition' in window)){
+      return false;
+  }else{ //音声認識の初期化
+    recognition = new SpeechRecognition();
+    if(recognition){
+        recognition.lang = 'ja-JP';
+        recognition.interimResults = true; // 暫定結果も返す
+        recognition.continuous = true;
+        
+        recognition.addEventListener('start', (event) => {
+           recognitionRestartableFlg = true;
+           elemCheckBox_ResultRecognition.checked = true;
+        })
+        recognition.addEventListener('end', (event) => {
+            addMessageOfRecognitionErr();
+            if (recognitionRestartableFlg) {
+                recognition.start();
+                recognitionRestartableFlg = false;
+                elemCheckBox_ResultRecognition.checked = false;
+                elemText_ResultRecognitionStatus.innerHTML="";
+                console.log("Recognition end(restart).");
+            }else{
+                console.log("Recognition end.");
+            }
+        })
+        recognition.addEventListener('result', (event) => {
+            let finalTranscript = ''; //確定結果
+            let interimTranscript = ''; // 暫定(灰色)の認識結果
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              let transcript = event.results[i][0].transcript;
+              if (event.results[i].isFinal) {
+                finalTranscript += transcript;
+                recognitionRestartableFlg = true;
+                console.log("Recognition final."+interimTranscript);
+                interimTranscript="";
+              } else {
+                interimTranscript = transcript;
+                recognitionRestartableFlg = false;
+              }
+            }
+            if(!recognitionRestartableFlg){
+                console.log("Recognition continue.");
+            }
+            addMessageOfRecognition(finalTranscript,interimTranscript);
+            
+        })
+        recognition.addEventListener('nomatch', (event) => {
+            addMessageOfRecognitionErr();
+            console.log("Recognition NoMatch:"+event.error);
+        })
+        recognition.addEventListener('error', (event) => {
+            addMessageOfRecognitionErr();
+            console.log("RecognitionError:"+event.error);
+        })
+        recognition.addEventListener('soundstart', (event) => {
+            elemText_ResultRecognitionStatus.innerHTML="●";
+        })
+        recognition.addEventListener('soundend', (event) => {
+            elemText_ResultRecognitionStatus.innerHTML="○";
+        })
+        
+        
+        
+        
+        
+        
+        // recognition.stop();
+        // recognition.start(); https://developer.mozilla.org/ja/docs/Web/API/SpeechRecognition
+    }
+  }
+}
+function addMessageOfRecognition(msg1,msg2){
+    let maxcount = 100; //表示最大文字数
+    const datetimeNow = new Date();
+    //let strTime = " ("+ datetimeNow.getHours()+":"+datetimeNow.getMinutes()+")";
+    
+    if(msg1!=""){
+      if(elemTextArea_ResultRecognition){
+          let msg = elemTextArea_ResultRecognition.value;
+          //msg += (strTime+msg1);
+          if(msg.length>maxcount){ msg=msg.slice( 0-maxcount ); }
+          elemTextArea_ResultRecognition.value = msg;
+      }
+      sendNewChatMessage(msg1);
+    }
+    if(elemTextArea_ResultRecognitionP){
+        elemTextArea_ResultRecognitionP.innerHTML = msg2;
+    }
+}
+function addMessageOfRecognitionErr(){
+    let msg='';
+    if(elemTextArea_ResultRecognitionP){
+        msg=elemTextArea_ResultRecognitionP.innerHTML;
+        elemTextArea_ResultRecognitionP.innerHTML="";
+    }
+    addMessageOfRecognition(msg,"");
+}
+
+function buildVideoConstraintsJSON() {
+  try {
+    videoConstraints = JSON.parse(videoConstraintsText);
+  } catch(error) {
+    handleError(error);
+  }
+}
+function buildAudioConstraintsJSON() {
+  try {
+    audioConstraints = JSON.parse(audioConstraintsText);
+  } catch(error) {
+    handleError(error);
+  }
+}
+function getCurrentSettings() {
+  if (videoTrack) {
+    videoConstraintsText = JSON.stringify(videoTrack.getSettings(), null, 2);
+  }
+  if (audioTrack) {
+    audioConstraintsText = JSON.stringify(audioTrack.getSettings(), null, 2);
+  }
+}
+videoConstraintsText = '{ "width": {"max":1280}, "height": {"max":720} ,"frameRate": { "ideal": 5, "max": 10 } }';
+audioConstraintsText = '{ "sampleSize": 8, "channelCount": 1, "echoCancellation": false}';
+
+
+
+
+
+
 function allDisabledElement(tgt,flg){
    if(tgt){if(tgt.length){
        for (let i = 0; i < tgt.length; i++){
@@ -434,6 +563,485 @@ function update_elemRange_microphoneLevelCurVal(){
 }
 
 
+
+
+
+
+// =====================================
+let SkyWayPeer;
+let connectedCalls={};  // 接続したコールを保存しておく連想配列変数
+let connectedDatas={};  // 接続したchatデータコネクトを保存しておく連想配列変数
+
+function startMultiparty(){
+  
+  // SkyWayのシグナリングサーバーへ接続する
+  SkyWayPeer = getSkywayPeerInstance();
+  
+  // シグナリングサーバへの接続が確立したときに、このopenイベントが呼ばれる
+  if(SkyWayPeer){
+    SkyWayPeer.on('open', function(){
+      // 自分のIDを表示する
+      // - 自分のIDはpeerオブジェクトのidプロパティに存在する
+      // - 相手はこのIDを指定することで、通話を開始することができる
+      elemText_myPeerId.value = (SkyWayPeer.id).toString();
+    });
+    
+
+    // 相手からデータ通信の接続要求イベントが来た場合、このconnectionイベントが呼ばれる
+    // - 渡されるconnectionオブジェクトを操作することで、データ通信が可能
+    SkyWayPeer.on('connection', function(dataConnection){
+            createNewPeerSettingData(dataConnection)
+    });
+
+    // 相手からビデオ通話がかかってきた場合、このcallイベントが呼ばれる
+    // - 渡されるcallオブジェクトを操作することで、ビデオ映像を送受信できる
+    SkyWayPeer.on('call', function(callConnection){
+            createNewPeerSettingCall(callConnection);
+    });
+
+    SkyWayPeer.on("close", () => {
+      let i=0;
+    });
+  }
+}
+// 新しい接続先に此方から接続に行った場合
+function addNewPeer(newPeerID){
+  if(SkyWayPeer){
+    
+    // 相手と通話を開始して、自分のストリームを渡す
+    sendStreamToPeer(newPeerID);
+    
+    // 相手へのデータ通信接続を開始する
+    connectDataToPeer(newPeerID);
+    
+  }
+}
+function sendStreamToPeer(newPeerID){
+    // 相手と通話を開始して、自分のストリームを渡す
+    let call = SkyWayPeer.call(newPeerID, localStream);
+    if(call){
+        //call.on("open", function() {
+            // 相手のストリームが渡された場合のイベントを設置する
+            createNewPeerSettingCall(call);
+        //})
+    }
+}
+function connectDataToPeer(newPeerID){
+    // 相手へのデータ通信接続を開始する
+    let conn = SkyWayPeer.connect(newPeerID);
+
+    if(conn){
+        //conn.on("open", function() {
+            createNewPeerSettingData(conn);
+                
+            // 相手のIDを表示する
+            // - 相手のIDはconnectionオブジェクトのidプロパティに存在する
+            //$("#peer-id").text(conn.remoteId);
+        //});
+        
+    }
+}
+function createNewPeerSettingData(dataConnection){
+    //新規の通信相手を設定する(data)
+    
+    // 切断時に利用するため、コネクションオブジェクトを保存しておく
+      connectedDatas[dataConnection.remoteId] = dataConnection;
+      
+      // メッセージ受信イベントの設定
+      dataConnection.on("data", function(data){
+            recieveNewChatMessage(dataConnection.remoteId , data);
+      });
+      
+      //先方から接続が切断された場合の処理
+      dataConnection.on("close", function(data){
+            let i=0;   // dummy
+            deletePeerFromDataList(dataConnection.remoteId);
+            deletePeerFromCallList(dataConnection.remoteId);//データ接続切断時は映像も切断する
+      });
+      
+}
+function createNewPeerSettingCall(callConnection){
+    //新規の通信相手を設定する(Stream)
+   
+   // 切断時に利用するため、コールオブジェクトを保存しておく
+   connectedCalls[callConnection.remoteId] = callConnection;
+   
+   // 映像表示用のHTML-Domを設置する
+   if(!(document.getElementById('peervideo-'+callConnection.remoteId))){
+      domAppendOrRemoveforPeer(1,callConnection.remoteId); //Dom生成
+   }
+   
+   if(callConnection._options.payload){
+       // 自分の映像ストリームを相手に渡す
+       // - getUserMediaで取得したストリームオブジェクトを指定する
+       if(!localStream) {
+          localStream=new MediaStream();
+       }
+       callConnection.answer(localStream);
+       
+   }
+   
+
+      
+      // 相手のストリームが渡された場合、このstreamイベントが呼ばれる
+      // - 渡されるstreamオブジェクトは相手の映像についてのストリームオブジェクト
+      let audioMixMode=0; // ビデオコントロールに任すなら０、自分でMixするなら1(動作しない?)
+      callConnection.on('stream', function(stream){
+          // 映像ストリームオブジェクトをURLに変換する
+          // - video要素に表示できる形にするため変換している
+          let tgtelem=document.getElementById('peervideo-'+callConnection.remoteId);
+          if(tgtelem){
+            let newstream = stream;
+            if(audioMixMode==1){
+                //ボリュームを追加
+                let audioctx={};
+                //audioctx.AudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioctx.gainNode = c_audioContext.createGain();
+                audioContextCtrls[callConnection.remoteId] = audioctx; //配列に保持する
+                let audioSource = c_audioContext.createMediaStreamSource(stream);//MediaStreamAudioSourceNodeが取れていない？
+                audioSource.connect(audioctx.gainNode);
+                audioctx.gainNode.gain.value =1;
+                
+                let newAudioStream = c_audioContext.createMediaStreamDestination();
+                audioctx.gainNode.connect(newAudioStream);
+                //
+                
+                //新規に作成した音声ストリームに、映像ストリームを付加
+                if(newAudioStream){
+                    let videoTrack=null;
+                    let videoTracks = stream.getVideoTracks();
+                    if (videoTracks.length) {
+                        videoTrack = videoTracks[0];
+                    }
+                    if (videoTrack!=null) {
+                        newAudioStream.stream.addTrack(videoTrack);
+                    }
+                    newstream = newAudioStream.stream;
+                }
+            }
+            // エレメントへ付加する
+            let oldBrowserFlg=-1;
+            if ('srcObject' in tgtelem) {
+              try {
+                //$('#peervideo-'+callConnection.remoteId).srcObject = newstream;
+                tgtelem.srcObject = newstream;
+                oldBrowserFlg=0;
+              } catch (error) {
+                oldBrowserFlg=1;
+              }
+            }
+            if(oldBrowserFlg!=0){
+                var url = URL.createObjectURL(newstream);
+                //$('#peervideo-'+callConnection.remoteId).prop('src', url);
+                tgtelem.prop('src', url); // video要素のsrcに設定することで、映像を表示する
+            }
+            
+            // HTML側で属性の指定をした場合は不要か
+            tgtelem.addEventListener('loadedmetadata', e => {
+                if(audioMixMode==1){
+                    tgtelem.muted = true;
+                }else{
+                    tgtelem.volume = 0.3;
+                    tgtelem.muted = false;
+                    tgtelem.controls=true;
+                }
+                tgtelem.play();
+            });
+
+
+          }
+      });
+
+      //先方から接続が切断された場合の処理
+      callConnection.on("close", () => {
+          let i=0;  // dummy
+          deletePeerFromCallList(callConnection.remoteId);
+      });
+
+
+}
+
+
+
+function deletePeerFromCallList(tgtPeerID){
+   
+   if ((tgtPeerID in connectedCalls) == true) {
+      
+      // 切断時に利用するため保存しておいた コールオブジェクト
+      let call = connectedCalls[tgtPeerID];
+      
+      //切断
+      if(call) call.close();
+      
+      //接続先リストから削除する
+      delete connectedCalls[tgtPeerID];
+      
+   }
+   //Dom削除
+   if ((tgtPeerID in connectedDatas) != true) {
+       domAppendOrRemoveforPeer(0,tgtPeerID);
+   }
+   
+}
+function deletePeerFromDataList(tgtPeerID){
+   
+   if ((tgtPeerID in connectedDatas) == true) {
+      
+      // 切断時に利用するため保存しておいた コールオブジェクト
+      let conn = connectedDatas[tgtPeerID];
+
+      //切断
+      if(conn) conn.close();
+      
+      //接続先リストから削除する
+      delete connectedDatas[tgtPeerID];
+      
+   }
+   //Dom削除
+   if ((tgtPeerID in connectedCalls) != true) {
+      domAppendOrRemoveforPeer(0,tgtPeerID);
+   }
+   
+}
+
+
+
+
+
+
+function getSkywayPeerInstance(){
+    let ans;
+    let varres;
+    let strKey;
+    
+    const cookieName = "SkyWayKey";
+    
+    varres = prompt( "SkyWay key" , getCookie(cookieName) );
+    if(varres){
+        strKey=varres.toString();
+        
+        ans = new Peer({ key:strKey, debug: 3}); /* SkyWay keyを指定 */
+        
+        ans.on("open",(function(strKeyID){
+            if(strKeyID){
+               setCookie(cookieName,this.socket._key);
+            }
+        }))
+    }
+    
+    return ans;
+}
+function getCookie(name){
+    let strValue;
+    const strCookiename = encodeURIComponent(name);
+    
+    let cookies = document.cookie.split(';');
+    cookies.forEach(function(value) {
+        let content = value.split('=');
+        if(content[0]==strCookiename){
+            strValue = content[1];
+        }
+    });
+    return strValue;
+}
+function setCookie(strName,strValue,expireDay =3){
+    let adddata;
+    
+    adddata = encodeURIComponent(strName) + "=" + encodeURIComponent(strValue);
+    
+    let expireTime =0;
+    expireTime = 60*60*24; //１日の秒数
+    expireTime *= expireDay;
+    adddata =adddata + ";max-age=" + (expireTime.toString());
+    
+    document.cookie = adddata;
+
+}
+
+
+
+function domAppendOrRemoveforPeer(mode,strTgtPeerId){
+  // Dom の <div id="streams">(=elemDiv_streams変数)内にPeer用のエレメントを追廃する
+  //let strTgtPeerId = call.remoteId;
+  let strvl;
+  let elemvl;
+
+  // 全削除
+  let tgtElement = document.getElementById('div_peerid-'+strTgtPeerId);
+  if(tgtElement){ 
+      while (tgtElement.firstChild) tgtElement.removeChild(tgtElement.firstChild);
+      tgtElement.remove(); 
+  }
+
+  //新規作成
+  if(mode){if(strTgtPeerId!=""){
+    let newelem = document.createElement("div");
+    newelem.id="div_peerid-"+strTgtPeerId;
+    elemDiv_streams.appendChild(newelem);
+    let tgtElement = document.getElementById('div_peerid-'+strTgtPeerId);
+    
+    newelem = document.createElement("video");
+    newelem.id="peervideo-"+ strTgtPeerId;
+    newelem.setAttribute("autoplay",true);
+    newelem.setAttribute("muted",true);
+    tgtElement.appendChild(newelem);
+    
+    newelem = document.createElement("br");
+    tgtElement.appendChild(newelem);
+    
+    newelem = document.createElement("span");
+    newelem.id="peerid-"+ strTgtPeerId;
+    tgtElement.appendChild(newelem);
+    
+    
+
+    //削除用のボタンを追加する
+    newelem = document.createElement("button");
+    newelem.type="button";
+    newelem.onclick=function(){
+       deletePeerFromCallList(strTgtPeerId);
+       deletePeerFromDataList(strTgtPeerId);
+    };
+    newelem.innerHTML="削除";
+    tgtElement.appendChild(newelem);
+
+    
+    
+    
+    
+    
+    // 相手のIDを表示する
+    elemvl = document.getElementById("peerid-" + strTgtPeerId);
+    if(elemvl){
+        //$("#peerid-" + strTgtPeerId).text(strTgtPeerId);
+        elemvl.innerHTML = strTgtPeerId;
+    }
+    
+  }}
+  
+  
+}
+
+
+// --------------------------
+function sendNewChatMessage(tgtmsg){
+    //チャットに送信する
+    
+    for (let key in connectedDatas) {
+       let conn = connectedDatas[key];
+       if(conn.open) conn.send(tgtmsg);
+    }
+
+    // 自分の画面に表示
+    let tgtid = "";
+    if(SkyWayPeer) { tgtid = SkyWayPeer.id; }
+    recieveNewChatMessage(tgtid,tgtmsg)
+    
+}
+// メッセージ受信イベントの設定
+let chatMessage_logAry=[];
+let chatMessage_saveCntMax=0;
+function recieveNewChatMessage(strid,data) {
+    // 画面に受信したメッセージを表示
+    let strAdd;
+    let strHM;
+    let strYMDHM;
+    
+    let nowtime = new Date();
+    strHM = "";
+    strHM = strHM +strFormatTwoChar(nowtime.getHours()) + ":" ;
+    strHM = strHM +strFormatTwoChar(nowtime.getMinutes());
+    
+    //strYMDHM = nowtime.getFullYear().toString() + "/" ;
+    //strYMDHM = strYMDHM +strFormatTwoChar(nowtime.getMonth()+1) + "/" ;
+    //strYMDHM = strYMDHM +strFormatTwoChar(nowtime.getDate()) + " " ;
+    //strYMDHM = strYMDHM + strHM +":";
+    //strYMDHM = strYMDHM +strFormatTwoChar(nowtime.getSeconds());
+    
+    
+    strAdd = strHM +" "+ strid +"\n" + data+"\n";
+    elemText_chatMessage_log.value += strAdd;
+    
+    elemText_chatMessage_log.scrollTop = elemText_chatMessage_log.scrollHeight;
+    
+    //保存
+    let logobj={};
+    logobj.rectime = nowtime;
+    logobj.peerid = strid;
+    logobj.data = data;
+    
+    chatMessage_logAry.push(logobj);
+    
+}
+function strFormatTwoChar(intval) {
+    let ans="";
+    if (intval<10) ans = ans +"0";
+    ans = ans + intval.toString();
+    return ans
+}
+
+
+
+
+function chatMessage_saveFN_onchange(){
+    saveChatMessageLog()
+}
+function saveChatMessageLog(){
+    let filename;
+    let blob;
+    let strData;
+    let strymd;
+
+    let cntmax = -1;
+    if(chatMessage_logAry){ cntmax=chatMessage_logAry.length; }
+    if(cntmax>0){
+        
+        filename = "log.txt";
+        if (filename!="") {
+            
+            if(1==2){
+                let write_json=JSON.stringify(chatMessage_logAry);
+                blob=new Blob([write_json], {type: 'application/json'});
+            }else{
+                
+                strData="";
+                for(let i=0;i<cntmax;i++){
+                    let logobj=chatMessage_logAry[i];
+                    
+                    strymd = logobj.rectime.getFullYear().toString() + "/" ;
+                    strymd = strymd +strFormatTwoChar(logobj.rectime.getMonth()+1) + "/" ;
+                    strymd = strymd +strFormatTwoChar(logobj.rectime.getDate()) + " " ;
+                    strymd = strymd +strFormatTwoChar(logobj.rectime.getHours()) + ":" ;
+                    strymd = strymd +strFormatTwoChar(logobj.rectime.getMinutes()) + ":" ;
+                    strymd = strymd +strFormatTwoChar(logobj.rectime.getSeconds());
+                    
+                    strData = strData + strymd;
+                    
+                    strData = strData + "," +logobj.peerid;
+                    strData = strData + "," +logobj.data.replace(/\r?\n/g, ' ');
+                    
+                    strData = strData + "\n"
+                }
+                blob = new Blob([strData],{type:"text/plan"});
+            }
+            elemText_chatMessage_saveBlobLink.href = URL.createObjectURL(blob);
+            elemText_chatMessage_saveBlobLink.download = filename;
+            elemText_chatMessage_saveBlobLink.click();
+
+
+            //保存したデータを配列から削除
+            if(confirm('出力分をメモリから削除しますか')){
+                 chatMessage_logAry.slice(0,cntmax)
+            }
+            
+        }
+    }
+
+}
+
+
+//  -----------
+
 function startVideo(triggerElem = null) {
 
     // カメラ／マイクのストリームを取得する
@@ -442,8 +1050,8 @@ function startVideo(triggerElem = null) {
         audio: audioConstraints
     }).then(function(stream) {
         
-        audioTracks = stream.getAudioTracks();
-        videoTracks = stream.getVideoTracks();
+        let audioTracks = stream.getAudioTracks();
+        let videoTracks = stream.getVideoTracks();
         if (audioTracks.length) {
             audioTrack = audioTracks[0];
         }
@@ -528,6 +1136,28 @@ function startVideo(triggerElem = null) {
         
         c_audioContext.resume().then(() => { console.log('Playback audioContext resumed successfully');}); //Chromeのセキュリティ設定
         
+    }).then(function() {
+        
+        let testflg = localStream.active;
+        
+        for (let key in connectedDatas) {
+           let flg=0;
+           if (key in connectedCalls){
+              let conn = connectedCalls[key];
+              if(conn.open) {
+                  //conn.replaceStream(localStream);
+                  //flg=1;
+                  conn.close();
+              }
+           }
+           if(flg==0){
+                  sendStreamToPeer(key); // 相手へのデータ通信接続を開始する
+                   // connectedCalls[key]の内容は更新される
+           }
+        }
+        
+        let aaaaa=0;
+
     }).catch(function(err) {
       console.log(err.name + ": " + err.message);
     });
@@ -551,6 +1181,20 @@ function stopVideo(triggerElem = null){
   } catch (error) {
      elemVideo.prop('src', null);
   }
+  
+  
+  
+  
+    for (let key in connectedCalls) {
+       let conn = connectedCalls[key];
+       if(conn.open) {
+           conn.close(true);
+       }
+       delete connectedCalls[key];
+    }
+  
+  
+  
   
   
   resurrectionBtnElem(triggerElem);
