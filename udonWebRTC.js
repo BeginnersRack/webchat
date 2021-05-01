@@ -514,10 +514,15 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
       // audio
       newelem = document.createElement("audio");
       newelem.id="peeraudio-"+ strTgtPeerId;
-      newelem.setAttribute("autoplay",true);
-      newelem.setAttribute("muted",true);
-      newelem.volume = 0.3;
-      newelem.controls="true";
+      newelem.autoplay=true;
+      newelem.setAttribute("autoplay",newelem.autoplay);
+      newelem.volume=0.1;
+      newelem.setAttribute("volume",newelem.volume);
+      newelem.muted=true;
+      newelem.setAttribute("muted",newelem.muted);
+      newelem.controls=true;
+      newelem.setAttribute("controls",newelem.controls);
+      
       newelem.addEventListener('loadedmetadata', e => {
                       newelem.muted = "false";
                  // newelem.play();
@@ -531,10 +536,16 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
       // video
       let newelem2 = document.createElement("video");
       newelem2.id="peervideo-"+ strTgtPeerId;
-      newelem2.setAttribute("autoplay",true);
-      newelem2.setAttribute("muted",true);
-      newelem2.setAttribute("controls",true);
-      newelem2.setAttribute("volumne",0.3);
+      newelem2.autoplay=true;
+      newelem2.setAttribute("autoplay",newelem2.autoplay);
+      newelem2.controls=true;
+      newelem2.setAttribute("controls",newelem2.controls);
+      newelem2.volume=0.1;
+      newelem2.setAttribute("volume",newelem2.volume);
+      newelem2.muted=true;
+      newelem2.setAttribute("muted",newelem2.muted);
+
+
       
       newelem = document.createElement("div");
       newelem.setAttribute("class","videoframe");
