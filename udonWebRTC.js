@@ -186,6 +186,31 @@ function createAudioOutputStream(){
 }
 
 
+//-----------------
+window.addEventListener("beforeunload", function(event) {
+    event.preventDefault();
+    event.returnValue = ''; //ページ遷移警告の表示
+    //quitAllConnection();
+});
+const terminationEvent = 'onpagehide' in self ? 'pagehide' : 'unload';
+window.addEventListener(terminationEvent, function(event) {
+    const cookieName = "recentPeerId";
+    let strValue="";
+    if(connectedDatas){
+        for (let peerid in connectedDatas) {
+            if(peerid!=SkyWayPeer.id){
+                strValue=peerid;
+            }
+        }
+    }
+    
+    if(strValue!=""){
+        setCookie(cookieName,strValue,(1.5/24/60)); //保持時間を日(/24/60で分)で指定
+    }
+    //---
+    quitAllConnection();
+});
+
 // ===================================================
 
 
@@ -248,6 +273,15 @@ function startMultiparty(){
       let i=0;
     });
   }
+  
+  
+  let strValue=getCookie("recentPeerId");
+  if(strValue){if(strValue!=""){
+      if(elemText_AddNewPeerID){
+          elemText_AddNewPeerID.value=strValue;
+      }
+  }}
+  
 }
 // 新しい接続先に此方から接続に行った場合
 function addNewPeer(newPeerID){
@@ -276,35 +310,111 @@ function connectDataToPeer(newPeerID){
     let conn = SkyWayPeer.connect(newPeerID);
 
     if(conn){
-        //conn.on("open", function() {
-            createNewPeerSettingData(conn);
+            createNewPeerSettingData(conn,1);
                 
             // 相手のIDを表示する
             // - 相手のIDはconnectionオブジェクトのidプロパティに存在する
             //$("#peer-id").text(conn.remoteId);
-        //});
-        
     }
 }
-function createNewPeerSettingData(dataConnection){
-    //新規の通信相手を設定する(data)
+function createNewPeerSettingData(dataConnection,directionFlg=0){
+    //新規の通信相手を設定する(data)  dataConnection.remoteId は相手のPeerID
+    // directionFlg=1:こちらからの接続要求。0：向こうからの接続要求
     
     // 切断時に利用するため、コネクションオブジェクトを保存しておく
       connectedDatas[dataConnection.remoteId] = dataConnection;
       
       // メッセージ受信イベントの設定
       dataConnection.on("data", function(data){
-            recieveNewChatMessage(dataConnection.remoteId , data);
+            checkRecievedDataStatus(dataConnection.remoteId , data);
       });
       
       //先方から接続が切断された場合の処理
       dataConnection.on("close", function(data){
             let i=0;   // dummy
-            deletePeerFromDataList(dataConnection.remoteId);
             deletePeerFromCallList(dataConnection.remoteId);//データ接続切断時は映像/音声も切断する
+            deletePeerFromDataList(dataConnection.remoteId);
+      });
+      
+      
+      dataConnection.on("open", function(data){
+          if(directionFlg==1){ //こちらからの接続要求である場合
+              //こちらで保持している接続先を相手に送信する
+              sendListConnection(dataConnection.remoteId,1);
+          }
       });
       
 }
+function sendListConnection(remoteId,requireCastFlg=0){
+    //こちらで保持している接続先を相手に送信する
+    if(remoteId){if (remoteId in connectedDatas){
+        let conn = connectedDatas[remoteId];
+        if(conn.open) {
+            let strlist = ""; 
+            if(!(remoteId in connectedDatas)){ strlist = ","+(remoteId.toString(10)) }
+            for (let key in connectedDatas) {
+                strlist += (","+key);
+            } 
+            
+            let stts="CL";
+            if (requireCastFlg!=0) stts+="2";
+            conn.send(stts+strlist); //strlistの最初はカンマ
+        }
+    }}
+    
+}
+function createConnectionByList(strList){
+    //与えられた接続先リストを確認し、未接続な相手があれば接続を試みる
+    let ans =0;
+    
+    let tgtlist = strList.split(",");
+    for (const tgtId of tgtlist) {
+        if(tgtId){if(tgtId!=""){if(tgtId!=SkyWayPeer.id){
+            if (!(tgtId in connectedDatas)){
+                addNewPeer(tgtId);
+                ans++;
+            }
+        }}}
+    }
+    
+    return ans;
+}
+function allSendListConnection(expires=""){
+    //全ての接続先に、こちらの接続先リストを送信する。但しExpiresを除く
+    for (let key in connectedDatas) {
+        if(key){if(key!=""){if(key!=SkyWayPeer.id){if(key!=expires){
+            sendListConnection(key);
+        }}}}
+    }
+}
+
+
+function checkRecievedDataStatus(remoteId,data){
+  // 受信データを種別で振分けする。remoteIdは送信者。
+  if(data){if(data.length>=3){
+      let stts = (data.split(",", 1 ))[0];
+      let data2 = data.slice(stts.length+1);
+      
+      switch(stts){
+        case "CM": // Chatメッセージ
+            recieveNewChatMessage(remoteId,data2);
+            break;
+        case "CL": // ConnectionList 接続先一覧
+        case "CL2": // 再送信要求付
+            createConnectionByList(data2);
+            if(stts=="CL2") { allSendListConnection(); }
+            break;
+        default:
+            console.log("["+remoteId+"]より不正なデータ("+stts+")を受診 : " + data);
+            break;
+      }
+  }}
+}
+
+
+
+
+
 function createNewPeerSettingCall(callConnection){
     //新規の通信相手を設定する(Stream)
    
@@ -405,9 +515,9 @@ function deletePeerFromCallList(tgtPeerID){
       
    }
    //Dom削除
-   if ((tgtPeerID in connectedDatas) != true) {
-       domAppendOrRemoveforPeer(0,tgtPeerID);
-   }
+   //if ((tgtPeerID in connectedDatas) != true) {
+   //    domAppendOrRemoveforPeer(0,tgtPeerID);
+   //}
    
 }
 function deletePeerFromDataList(tgtPeerID){
@@ -432,6 +542,17 @@ function deletePeerFromDataList(tgtPeerID){
 }
 
 
+function quitAllConnection(){
+    //全ての接続先を切断する
+   
+   for (let tgtPeerID in connectedCalls) {
+      deletePeerFromCallList(tgtPeerID);
+   }
+   for (let tgtPeerID in connectedDatas) {
+      deletePeerFromDataList(tgtPeerID);
+   }
+   
+}
 
 
 
@@ -465,8 +586,8 @@ function getCookie(name){
     let cookies = document.cookie.split(';');
     cookies.forEach(function(value) {
         let content = value.split('=');
-        if(content[0]==strCookiename){
-            strValue = content[1];
+        if((content[0].trim())==strCookiename){
+            strValue = (content[1].trim());
         }
     });
     return strValue;
@@ -505,7 +626,9 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
     //コンテナとなるDiv要素
     let newelem = document.createElement("div");
     newelem.id="div_peerid-"+strTgtPeerId;
+    newelem.style="display:inline-block"; // 縦に並べるならblock,横ならinline-block
     elemDiv_streams.appendChild(newelem);
+    
     let tgtElement = document.getElementById('div_peerid-'+strTgtPeerId);
     
     //内容
@@ -615,7 +738,7 @@ function sendNewChatMessage(tgtmsg){
     
     for (let key in connectedDatas) {
        let conn = connectedDatas[key];
-       if(conn.open) conn.send(tgtmsg);
+       if(conn.open) conn.send("CM,"+tgtmsg);
     }
 
     // 自分の画面に表示

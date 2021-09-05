@@ -53,6 +53,7 @@ let soundOnlyFlg =false;
 let elemStream_SW;
 let elemStream_SW_Msg;
 let elemMic_SW;
+let elemMic_STTS
 let elemRange_microphoneLevel;
 let elemRange_microphoneLevelCurVal;
 let elemVolume_SW
@@ -75,6 +76,7 @@ if(soundOnlyFlg){
 }else{
   let elemVideo;
   let elemVideo_SW;
+  let elemVideo_STTS;
   let elemRange_VideoFrameRate;
   let elemRange_VideoFrameRateCurVal;
 }
@@ -89,7 +91,9 @@ document.addEventListener('DOMContentLoaded', function() {  // <<< $(function() 
 function myOnload(){
   elemStream_SW =  document.getElementById('my-stream_sw');
   elemStream_SW_Msg =  document.getElementById('my-stream_sw_message');
+  elemVideo_STTS =  document.getElementById('my-video_status');
   elemMic_SW =  document.getElementById('my-mic_sw');
+  elemMic_STTS =  document.getElementById('my-mic_status');
   elemRange_microphoneLevel = document.getElementById('my-microphoneLevel');
   elemRange_microphoneLevelCurVal = document.getElementById('my-microphoneLevel_currentValue');
 
@@ -239,11 +243,11 @@ function myOnload(){
          if(e.target.value!=0){
              e.target.value=0;
              e.target.innerText = "送信再開";
-             if(elemStream_SW_Msg){elemStream_SW_MsginnerText="停止中";}
+             dispInfoStreamStatus();
          }else{
              e.target.value=1;
              e.target.innerText = "送信停止";
-             if(elemStream_SW_Msg){elemStream_SW_MsginnerText="送信中";}
+             dispInfoStreamStatus();
          }
          
          initVideoConstraints(elemStream_SW);
@@ -264,6 +268,7 @@ function myOnload(){
          if(e.target.value!=0){
              e.target.value=0;
              e.target.innerText = "ON";
+             dispInfoStreamStatus(); //音声停止中
              
              if(localStream){
                  changAbleStream(localStream.getAudioTracks(),false);//Off
@@ -281,6 +286,7 @@ function myOnload(){
          }else{
              e.target.value=1;
              e.target.innerText = "OFF";
+             dispInfoStreamStatus(); //音声送出中
              
              if(localStream){
                  changAbleStream(localStream.getAudioTracks(),true);//On
@@ -313,45 +319,47 @@ function myOnload(){
    
    
    //elemVolume_SW =  document.getElementById('my-volume_sw');
-   if(elemVolume_SW){
-     elemVolume_SW.addEventListener('click', function(e){
-         e.target.setAttribute("disabled", true);
-         if(e.target.value!=0){ //Offにする
-             e.target.value=0;
-             e.target.innerText = "ON";
+//   if(elemVolume_SW){
+//     elemVolume_SW.addEventListener('click', function(e){
+//         e.target.setAttribute("disabled", true);
+//         if(e.target.value!=0){ //Offにする
+//             e.target.value=0;
+//             e.target.innerText = "ON";
+//
+//         }else{ // Onにする
+//             e.target.value=1;
+//             e.target.innerText = "Mute";
+//         }
 
-         }else{ // Onにする
-             e.target.value=1;
-             e.target.innerText = "Mute";
-         }
-//         if(elemVideo){
-//             if(e.target.value==0){
-//                 elemVideo.setAttribute("muted", true);
-//                 elemVideo.muted = true;
-//             }else{
-//                 elemVideo.muted = false;
-//                elemVideo.removeAttribute("muted");
-//               
-//            //   c_audioContext.resume().then(() => { console.log('Playback audioContext resumed successfully');});
-//                 
-//             }
+  //         if(elemVideo){
+  //             if(e.target.value==0){
+  //                 elemVideo.setAttribute("muted", true);
+  //                 elemVideo.muted = true;
+  //             }else{
+  //                 elemVideo.muted = false;
+  //                elemVideo.removeAttribute("muted");
+  //               
+  //            //   c_audioContext.resume().then(() => { console.log('Playback audioContext resumed successfully');});
+  //                 
+  //             }
+  //         }
+
+//         e.target.removeAttribute("disabled");
+//     });
+//   }
+//   //elemRange_VolumeLevel = document.getElementById('my-volumeLevel');
+//   //elemRange_VolumeLevelCurVal = document.getElementById('my-volumeLevel_currentValue');
+//   if(elemRange_VolumeLevel){
+//     elemRange_VolumeLevel.addEventListener('input', function(e){
+//         if(elemRange_VolumeLevelCurVal){
+//             elemRange_VolumeLevelCurVal.innerText = e.target.value;
 //         }
-         e.target.removeAttribute("disabled");
-     });
-   }
-   //elemRange_VolumeLevel = document.getElementById('my-volumeLevel');
-   //elemRange_VolumeLevelCurVal = document.getElementById('my-volumeLevel_currentValue');
-   if(elemRange_VolumeLevel){
-     elemRange_VolumeLevel.addEventListener('input', function(e){
-         if(elemRange_VolumeLevelCurVal){
-             elemRange_VolumeLevelCurVal.innerText = e.target.value;
-         }
-//         if(elemVideo){
-//             elemVideo.volume = e.target.value;
-//         }
-     });
-     elemRange_VolumeLevel.dispatchEvent(c_elemEvent_input);
-   }
+  //         if(elemVideo){
+  //             elemVideo.volume = e.target.value;
+  //         }
+//     });
+//     elemRange_VolumeLevel.dispatchEvent(c_elemEvent_input);
+//   }
    
    
    //elemRec_SW =  document.getElementById('my-rec_sw');
@@ -434,12 +442,14 @@ function myOnload(){
              if(e.target.value!=0){
                  e.target.value=0;
                  e.target.innerText = "ON";
+                 dispInfoStreamStatus();
                  
                  if(localStream){if(localStream.getVideoTracks){ 
                      changAbleStream(localStream.getVideoTracks(),false); }} //Off
              }else{
                  e.target.value=1;
                  e.target.innerText = "OFF";
+                 dispInfoStreamStatus();
                  
                  if(localStream){if(localStream.getVideoTracks){ 
                      changAbleStream(localStream.getVideoTracks(),true); }} //On
@@ -465,6 +475,25 @@ function myOnload(){
    // =============================
    startMultiparty();
    
+}
+function dispInfoStreamStatus(){
+   if(elemStream_SW){
+     if(elemStream_SW.value==0){
+             if(elemStream_SW_Msg){elemStream_SW_Msg.innerText="停止中";}
+             if(elemMic_STTS)  {elemMic_STTS.innerText  ="";}
+             if(elemVideo_STTS){elemVideo_STTS.innerText="";}
+     }else{
+             if(elemStream_SW_Msg){elemStream_SW_Msg.innerText="送信中";}
+             if(elemMic_SW){if(elemMic_STTS){
+                 if(elemMic_SW.value!=0)   {elemMic_STTS.innerText  ="音声送出中";}
+                 else                      {elemMic_STTS.innerText  ="音声停止中";}
+             }}
+             if(elemVideo_SW){if(elemVideo_STTS){
+                 if(elemVideo_SW.value!=0) {elemVideo_STTS.innerText  ="映像送出中";}
+                 else                      {elemVideo_STTS.innerText  ="映像停止中";}
+             }}
+     }
+   }
 }
 
 
