@@ -30,6 +30,7 @@ const saveaudio_chunks = [];   // 音声の録音用データ格納先
 function audioRecCommand(mode){ //HTMLボタンより呼び出される。 mode=0:停止, 1:開始
     if(mode==1){ // 開始
         createAudioOutputStream();
+        sendNewChatMessage("(system-rec)");
         
     }else{ // 終了
         if(mediaRecorder){
@@ -188,12 +189,9 @@ function createAudioOutputStream(){
 
 //-----------------
 window.addEventListener("beforeunload", function(event) {
-    event.preventDefault();
-    event.returnValue = ''; //ページ遷移警告の表示
-    //quitAllConnection();
-});
-const terminationEvent = 'onpagehide' in self ? 'pagehide' : 'unload';
-window.addEventListener(terminationEvent, function(event) {
+
+
+    //接続先PeerIDをクッキーに保存しておく
     const cookieName = "recentPeerId";
     let strValue="";
     if(connectedDatas){
@@ -207,8 +205,30 @@ window.addEventListener(terminationEvent, function(event) {
     if(strValue!=""){
         setCookie(cookieName,strValue,(1.5/24/60)); //保持時間を日(/24/60で分)で指定
     }
-    //---
-    quitAllConnection();
+    
+
+
+    if(1==1){
+        //    残念ながら、unloadイベントでは非同期処理は実行できない（実行されるまえに終了してしまう）
+        //    このため、ページ遷移警告の後に切断処理等をおこなうことはできない。
+        event.preventDefault(); //ページ遷移警告の表示
+        event.returnValue = ''; //ページ遷移警告の表示
+    }else{
+        //--- 切断 --- 
+        sendNewChatMessage("(退出)");
+        quitAllConnection();
+    }
+    //quitAllConnection();
+});
+const terminationEvent = 'onpagehide' in self ? 'pagehide' : 'unload';
+window.addEventListener(terminationEvent, function(event) {
+
+    //--- 切断 --- 
+    //    残念ながら、unloadイベントでは非同期処理は実行できない（実行されるまえに終了してしまう）
+    //    このため、ページ遷移警告の後に切断処理等をおこなうことはできない。
+    //sendNewChatMessage("(退出)");
+    //quitAllConnection();
+    
 });
 
 // ===================================================
@@ -311,18 +331,30 @@ function connectDataToPeer(newPeerID){
 
     if(conn){
             createNewPeerSettingData(conn,1);
-                
             // 相手のIDを表示する
             // - 相手のIDはconnectionオブジェクトのidプロパティに存在する
             //$("#peer-id").text(conn.remoteId);
+
+
     }
 }
 function createNewPeerSettingData(dataConnection,directionFlg=0){
     //新規の通信相手を設定する(data)  dataConnection.remoteId は相手のPeerID
     // directionFlg=1:こちらからの接続要求。0：向こうからの接続要求
     
-    // 切断時に利用するため、コネクションオブジェクトを保存しておく
+
+
+     if (dataConnection.remoteId in connectedDatas) {
+         console.log("Warning : コネクションojb上書き発生 ["+dataConnection.remoteId+"]."  );
+     }else{
+         recieveNewChatMessage(dataConnection.remoteId,"(接続)",1); // 自分のLog画面に表示
+     }
+
+
+      
+     // 切断時に利用するため、コネクションオブジェクトを保存しておく
       connectedDatas[dataConnection.remoteId] = dataConnection;
+
       
       // メッセージ受信イベントの設定
       dataConnection.on("data", function(data){
@@ -340,10 +372,13 @@ function createNewPeerSettingData(dataConnection,directionFlg=0){
       dataConnection.on("open", function(data){
           if(directionFlg==1){ //こちらからの接続要求である場合
               //こちらで保持している接続先を相手に送信する
-              sendListConnection(dataConnection.remoteId,1);
+              sendListConnection(dataConnection.remoteId,1); // 送信先相手に、再送信要求付を付ける
           }
       });
       
+
+
+   
 }
 function sendListConnection(remoteId,requireCastFlg=0){
     //こちらで保持している接続先を相手に送信する
@@ -357,26 +392,50 @@ function sendListConnection(remoteId,requireCastFlg=0){
             } 
             
             let stts="CL";
-            if (requireCastFlg!=0) stts+="2";
+            if (requireCastFlg!=0) stts+="2"; // 再送信要求付
             conn.send(stts+strlist); //strlistの最初はカンマ
         }
     }}
     
 }
-function createConnectionByList(strList){
+function createConnectionByList(strList,mode){
     //与えられた接続先リストを確認し、未接続な相手があれば接続を試みる
+    // mode=0:通常、1:IDが自分より大きい相手のみ、2:小さい相手のみ
     let ans =0;
+    let flg=0;
+    let flg2=0
     
     let tgtlist = strList.split(",");
     for (const tgtId of tgtlist) {
         if(tgtId){if(tgtId!=""){if(tgtId!=SkyWayPeer.id){
             if (!(tgtId in connectedDatas)){
-                addNewPeer(tgtId);
-                ans++;
+                flg=0;
+                switch(mode){
+                    case 0:
+                        flg=1;
+                        break;
+                    case 1:
+                        if(tgtId>SkyWayPeer.id) {flg=1;} else {flg2=1;};
+                        break;
+                    case 2:
+                        if(tgtId<SkyWayPeer.id) {flg=1;} 
+                        break;
+                    default:
+                        flg=0;
+                }
+                if (flg!=0){
+                    addNewPeer(tgtId);
+                    ans++;
+                }
             }
         }}}
     }
     
+    if (mode==1){
+        if(flg2!=0){
+            setTimeout( createConnectionByList(strList,2) ,1000);
+        }
+    }
     return ans;
 }
 function allSendListConnection(expires=""){
@@ -401,8 +460,11 @@ function checkRecievedDataStatus(remoteId,data){
             break;
         case "CL": // ConnectionList 接続先一覧
         case "CL2": // 再送信要求付
-            createConnectionByList(data2);
-            if(stts=="CL2") { allSendListConnection(); }
+            createConnectionByList(data2,1);
+            if(stts=="CL2") {
+                allSendListConnection(); //新規入室者を全メンバーに通知
+                //sendNewChatMessage("(入室) "+remoteId); // 入室者はremoteIdであり、自分は申請受付者になる
+            }
             break;
         default:
             console.log("["+remoteId+"]より不正なデータ("+stts+")を受診 : " + data);
@@ -533,6 +595,7 @@ function deletePeerFromDataList(tgtPeerID){
       //接続先リストから削除する
       delete connectedDatas[tgtPeerID];
       
+      recieveNewChatMessage(tgtPeerID,"(退室)",1); // 自分のLog画面に表示
    }
    //Dom削除
    if ((tgtPeerID in connectedCalls) != true) {
@@ -656,7 +719,7 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
       newelem = document.createElement("br");
       tgtElement.appendChild(newelem);
     }else{
-      // video
+      // video   （サイズ等は div.videoframe スタイルシートで定義）
       let newelem2 = document.createElement("video");
       newelem2.id="peervideo-"+ strTgtPeerId;
       newelem2.autoplay=true;
@@ -709,6 +772,7 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
     
 
     //削除用のボタンを追加する
+  if(1==2){
     newelem = document.createElement("button");
     newelem.type="button";
     newelem.onclick=function(){
@@ -717,7 +781,7 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
     };
     newelem.innerHTML="削除";
     tgtElement.appendChild(newelem);
-
+  }
     
     
     
@@ -741,7 +805,7 @@ function sendNewChatMessage(tgtmsg){
        if(conn.open) conn.send("CM,"+tgtmsg);
     }
 
-    // 自分の画面に表示
+    // 自分のLog画面に表示
     let tgtid = "";
     if(SkyWayPeer) { tgtid = SkyWayPeer.id; }
     recieveNewChatMessage(tgtid,tgtmsg)
@@ -750,7 +814,7 @@ function sendNewChatMessage(tgtmsg){
 // メッセージ受信イベントの設定
 let chatMessage_logAry=[];
 let chatMessage_saveCntMax=0;
-function recieveNewChatMessage(strid,data) {
+function recieveNewChatMessage(strid,data,crflg=0) {
     // 画面に受信したメッセージを表示
     let strAdd;
     let strHM;
@@ -768,7 +832,10 @@ function recieveNewChatMessage(strid,data) {
     //strYMDHM = strYMDHM +strFormatTwoChar(nowtime.getSeconds());
     
     
-    strAdd = strHM +" "+ strid +"\n" + data+"\n";
+    strAdd = strHM +" "+ strid;
+    if(crflg==0) strAdd = strAdd+"\n";
+    strAdd = strAdd + data+"\n";
+    
     elemText_chatMessage_log.value += strAdd;
     
     elemText_chatMessage_log.scrollTop = elemText_chatMessage_log.scrollHeight;
@@ -852,12 +919,43 @@ function saveChatMessageLog(){
 //  -----------
 
 function startVideo(triggerElem = null) {
-
+  
+  //デバイス確認
+  let enableVideoFlg =0;
+  let enableAudioFlg =0;
+  navigator.mediaDevices.enumerateDevices()
+  .then(function(devices) { // 成功時
+      devices.forEach(function(device) {
+         if(device.kind=="videoinput"){ enableVideoFlg=1; }
+         if(device.kind=="audioinput"){ enableAudioFlg=1; }
+      });
+  }).catch(function(err) { // エラー発生時
+      console.log(err.name + "[enumerateDevices]: " + err.message);
+  }).then( function(stream) {
+    
+    
+    if((enableVideoFlg+enableAudioFlg)==0){
+        startVideo_functionEnd(); // 終了処理
+    }
+    
+    
+    enableVideoFlg=0;
+        
+        
+    
     // カメラ／マイクのストリームを取得する
-    navigator.mediaDevices.getUserMedia({
-        video: videoConstraints ,
-        audio: audioConstraints
-    }).then(function(stream) {
+    
+    //navigator.mediaDevices.getUserMedia({
+    //    video: videoConstraints ,
+    //    audio: audioConstraints
+    //}).then( function(stream) 
+    
+    let enableDeviceAry = {};
+    if(enableVideoFlg!=0){enableDeviceAry.video = videoConstraints;}
+    if(enableAudioFlg!=0){enableDeviceAry.audio = audioConstraints;}
+    
+    navigator.mediaDevices.getUserMedia(enableDeviceAry
+    ).then( function(stream) {
         
         let audioTracks = stream.getAudioTracks();
         if (audioTracks.length) {
@@ -980,15 +1078,20 @@ function startVideo(triggerElem = null) {
            }
         }
         
-    }).then(function() {
-        
-        setTimeout(function(){resurrectionBtnElem(triggerElem)}, 1000);
-        
-    }).catch(function(err) {
-      console.log(err.name + ": " + err.message);
+    }).then(function() { // 終了処理
+        startVideo_functionEnd(); 
+    }).catch(function(err) { // エラー発生時
+      console.log(err.name + "[]: " + err.message);
     });
-
-
+  
+  
+  });
+  
+  
+  //------- 終了処理
+  function startVideo_functionEnd(){
+      setTimeout(function(){resurrectionBtnElem(triggerElem)}, 1000);
+  }
 }
 
 

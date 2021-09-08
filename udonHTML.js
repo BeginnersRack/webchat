@@ -242,11 +242,11 @@ function myOnload(){
          e.target.setAttribute("disabled", true);
          if(e.target.value!=0){
              e.target.value=0;
-             e.target.innerText = "送信再開";
+             e.target.innerText = "通信再開";
              dispInfoStreamStatus();
          }else{
              e.target.value=1;
-             e.target.innerText = "送信停止";
+             e.target.innerText = "通信停止";
              dispInfoStreamStatus();
          }
          
@@ -483,7 +483,7 @@ function dispInfoStreamStatus(){
              if(elemMic_STTS)  {elemMic_STTS.innerText  ="";}
              if(elemVideo_STTS){elemVideo_STTS.innerText="";}
      }else{
-             if(elemStream_SW_Msg){elemStream_SW_Msg.innerText="送信中";}
+             if(elemStream_SW_Msg){elemStream_SW_Msg.innerText="通信中";}
              if(elemMic_SW){if(elemMic_STTS){
                  if(elemMic_SW.value!=0)   {elemMic_STTS.innerText  ="音声送出中";}
                  else                      {elemMic_STTS.innerText  ="音声停止中";}
