@@ -30,13 +30,14 @@ const saveaudio_chunks = [];   // 音声の録音用データ格納先
 function audioRecCommand(mode){ //HTMLボタンより呼び出される。 mode=0:停止, 1:開始
     if(mode==1){ // 開始
         createAudioOutputStream();
-        sendNewChatMessage("(system-rec)");
-        
+        //sendNewChatMessage("(system-rec)");
+        if(elemTextArea_RecSound)elemTextArea_RecSound.innerHTML="録音中";
     }else{ // 終了
         if(mediaRecorder){
             mediaRecorder.stop();
         }
         mediaRecorder=null;
+        if(elemTextArea_RecSound)elemTextArea_RecSound.innerHTML="";
     }
 }
 function createAudioOutputStream(){
@@ -208,6 +209,8 @@ window.addEventListener("beforeunload", function(event) {
     
 
 
+
+
     if(1==1){
         //    残念ながら、unloadイベントでは非同期処理は実行できない（実行されるまえに終了してしまう）
         //    このため、ページ遷移警告の後に切断処理等をおこなうことはできない。
@@ -218,7 +221,7 @@ window.addEventListener("beforeunload", function(event) {
         sendNewChatMessage("(退出)");
         quitAllConnection();
     }
-    //quitAllConnection();
+    
 });
 const terminationEvent = 'onpagehide' in self ? 'pagehide' : 'unload';
 window.addEventListener(terminationEvent, function(event) {
@@ -228,6 +231,26 @@ window.addEventListener(terminationEvent, function(event) {
     //    このため、ページ遷移警告の後に切断処理等をおこなうことはできない。
     //sendNewChatMessage("(退出)");
     //quitAllConnection();
+    
+    
+    let intCnt=Object.keys(connectedDatas).length;
+    if (intCnt>0){
+        sendNewChatMessage("(退出)");
+        quitAllConnection();
+        
+        // 終了するまでの時間稼ぎをする(ただし最大30秒まで)
+        let tgttime = new Date();
+        tgttime.setSeconds( tgttime.getSeconds() + 30);
+        
+        while (intCnt>0) {
+            intCnt = Object.keys(connectedDatas).length;
+            
+            let nowtime = new Date();
+            if(nowtime>tgttime) intCnt=0;
+        }
+        
+    }
+    
     
 });
 
@@ -772,14 +795,14 @@ function domAppendOrRemoveforPeer(mode,strTgtPeerId){
     
 
     //削除用のボタンを追加する
-  if(1==2){
+  if(1==1){
     newelem = document.createElement("button");
     newelem.type="button";
     newelem.onclick=function(){
        deletePeerFromCallList(strTgtPeerId);
        deletePeerFromDataList(strTgtPeerId);
     };
-    newelem.innerHTML="削除";
+    newelem.innerHTML="x"; //削除
     tgtElement.appendChild(newelem);
   }
     

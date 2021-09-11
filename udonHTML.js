@@ -71,6 +71,8 @@ let elemText_chatMessage_saveFN;
 let elemText_chatMessage_saveBlobLink;
 
 let elemRec_SW;
+let elemTextArea_RecSound;
+
 if(soundOnlyFlg){
   let elemAudio_myMic;
 }else{
@@ -111,6 +113,7 @@ function myOnload(){
   elemText_chatMessage_saveBlobLink = document.getElementById("textarea_chatMessage-save_bloblink");
   
   elemRec_SW =  document.getElementById('my-rec_sw');
+  elemTextArea_RecSound = document.getElementById('textarea_ResultRecSound');
   if(soundOnlyFlg){
       elemAudio_myMic = document.getElementById('my-audio');
   }else{
