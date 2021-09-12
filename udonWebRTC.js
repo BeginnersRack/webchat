@@ -29,16 +29,20 @@ const saveaudio_chunks = [];   // 音声の録音用データ格納先
 
 function audioRecCommand(mode){ //HTMLボタンより呼び出される。 mode=0:停止, 1:開始
     if(mode==1){ // 開始
-        createAudioOutputStream();
-        //sendNewChatMessage("(system-rec)");
-        if(elemTextArea_RecSound)elemTextArea_RecSound.innerHTML="録音中";
+        if(createAudioOutputStream()<=0){
+            mode=0;
+        }else{
+            //sendNewChatMessage("(system-rec)");
+            if(elemTextArea_RecSound)elemTextArea_RecSound.innerHTML="録音中";
+        }
     }else{ // 終了
         if(mediaRecorder){
             mediaRecorder.stop();
         }
-        mediaRecorder=null;
+        //mediaRecorder=null;
         if(elemTextArea_RecSound)elemTextArea_RecSound.innerHTML="";
     }
+    return mode;
 }
 function createAudioOutputStream(){
     
@@ -93,13 +97,16 @@ function createAudioOutputStream(){
     //        sorceCnt+=1;
     //    }
         
-        let audioTracks = audioContextCtrls[key].orgStream.getAudioTracks();
-        if(audioTracks.length) {if(audioTracks[0]){
+        let audioTracks = null;
+        if(audioContextCtrls[key]){if(audioContextCtrls[key].orgStream){
+            audioTracks = audioContextCtrls[key].orgStream.getAudioTracks();
+        }}
+        if(audioTracks){if(audioTracks.length) {if(audioTracks[0]){
           //let ctrls = recAudioContext.createMediaStreamSource(audioContextCtrls[key].orgStream);
             let ctrls = recAudioContext.createMediaStreamSource(new MediaStream(audioTracks));
             ctrls.connect(newDestination);
             sorceCnt+=1;
-        }}
+        }}}
     }
     
     // output
@@ -160,12 +167,17 @@ function createAudioOutputStream(){
     
     
     
-    if(sorceCnt>0){
-        mediaRecorder = new MediaRecorder(newDestination.stream, { mimeType: 'audio/webm' });
+    if(sorceCnt<=0){
+        console.log("debug : No AudioSource for Record."  );
+    }else{
+        let mimetypeChoice='audio/webm';
+        if(MediaRecorder.isTypeSupported("audio/webm\;codecs=opus")){ mimetypeChoice='audio/webm\;codecs=opus'; }
+        
+        mediaRecorder = new MediaRecorder(newDestination.stream, { mimeType: mimetypeChoice });
         
         for(let i=saveaudio_chunks.length;i>0;i--){
             saveaudio_chunks.shift();
-        }
+        } // saveaudio_chunks を空にする。
         
         mediaRecorder.addEventListener('dataavailable', e => { 
               // 一定間隔で録画が区切られて、データが渡される
@@ -177,17 +189,34 @@ function createAudioOutputStream(){
         
         mediaRecorder.addEventListener('stop', () => {
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob(saveaudio_chunks));
+            a.href = URL.createObjectURL(new Blob(saveaudio_chunks,{'type': mimetypeChoice }));
             a.download = 'audio-test.webm';
             a.click();
+            
+            mediaRecorder=null;
         });
         
         mediaRecorder.start();
     }
     
+    return sorceCnt;
 }
-
-
+function recreateAudioOutputStream(){
+    if(mediaRecorder){
+        
+        mediaRecorder.stop(); // 一旦、今までの録音内容をファイルに出力
+        
+        recreateAudioOutputStream_restart(); // 録音を再開
+        
+    }
+}
+function recreateAudioOutputStream_restart(){
+    if(mediaRecorder){
+        setTimeout( recreateAudioOutputStream_restart ,100);
+    } else {
+        createAudioOutputStream();
+    }
+}
 //-----------------
 window.addEventListener("beforeunload", function(event) {
 
@@ -204,7 +233,7 @@ window.addEventListener("beforeunload", function(event) {
     }
     
     if(strValue!=""){
-        setCookie(cookieName,strValue,(1.5/24/60)); //保持時間を日(/24/60で分)で指定
+        setCookie(cookieName,strValue,(0.5)); //保持時間を日で指定
     }
     
 
@@ -326,15 +355,15 @@ function startMultiparty(){
   }}
   
 }
-// 新しい接続先に此方から接続に行った場合
-function addNewPeer(newPeerID){
+// 新しい接続先に此方から接続に行った場合。 利用者の操作からの処理である場合 actionFlg=1
+function addNewPeer(newPeerID,actionFlg=1){
   if(SkyWayPeer){
     
     // 相手と通話を開始して、自分のストリームを渡す
     sendStreamToPeer(newPeerID);
     
     // 相手へのデータ通信接続を開始する
-    connectDataToPeer(newPeerID);
+    connectDataToPeer(newPeerID,actionFlg);
     
   }
 }
@@ -348,12 +377,12 @@ function sendStreamToPeer(newPeerID){
         //})
     }
 }
-function connectDataToPeer(newPeerID){
+function connectDataToPeer(newPeerID,actionFlg=0){
     // 相手へのデータ通信接続を開始する
     let conn = SkyWayPeer.connect(newPeerID);
 
     if(conn){
-            createNewPeerSettingData(conn,1);
+            createNewPeerSettingData(conn,1,actionFlg);
             // 相手のIDを表示する
             // - 相手のIDはconnectionオブジェクトのidプロパティに存在する
             //$("#peer-id").text(conn.remoteId);
@@ -361,14 +390,13 @@ function connectDataToPeer(newPeerID){
 
     }
 }
-function createNewPeerSettingData(dataConnection,directionFlg=0){
+function createNewPeerSettingData(dataConnection,directionFlg=0,actionFlg=0){
     //新規の通信相手を設定する(data)  dataConnection.remoteId は相手のPeerID
     // directionFlg=1:こちらからの接続要求。0：向こうからの接続要求
-    
-
+    console.log("debug : createNewPeerSettingData() "+(directionFlg==1 ? "to ":directionFlg==0 ? "from ":"??? ")+dataConnection.remoteId+"."  );
 
      if (dataConnection.remoteId in connectedDatas) {
-         console.log("Warning : コネクションojb上書き発生 ["+dataConnection.remoteId+"]."  );
+         console.log("Warning (debug): コネクションojb上書き発生 ["+dataConnection.remoteId+"]."  );
      }else{
          recieveNewChatMessage(dataConnection.remoteId,"(接続)",1); // 自分のLog画面に表示
      }
@@ -378,6 +406,11 @@ function createNewPeerSettingData(dataConnection,directionFlg=0){
      // 切断時に利用するため、コネクションオブジェクトを保存しておく
       connectedDatas[dataConnection.remoteId] = dataConnection;
 
+     // 通信相手一覧のHTML-Domを設置する
+      if(!(document.getElementById('div_peerid-'+dataConnection.remoteId))){
+          domAppendOrRemoveforPeer(1,dataConnection.remoteId); //Dom生成
+      }
+      
       
       // メッセージ受信イベントの設定
       dataConnection.on("data", function(data){
@@ -393,7 +426,7 @@ function createNewPeerSettingData(dataConnection,directionFlg=0){
       
       
       dataConnection.on("open", function(data){
-          if(directionFlg==1){ //こちらからの接続要求である場合
+          if(actionFlg!=0){ //こちらからの要求操作である場合
               //こちらで保持している接続先を相手に送信する
               sendListConnection(dataConnection.remoteId,1); // 送信先相手に、再送信要求付を付ける
           }
@@ -415,13 +448,13 @@ function sendListConnection(remoteId,requireCastFlg=0){
             } 
             
             let stts="CL";
-            if (requireCastFlg!=0) stts+="2"; // 再送信要求付
+            if (requireCastFlg!=0) stts+="2"; // 再送信要求付 CL2
             conn.send(stts+strlist); //strlistの最初はカンマ
         }
     }}
     
 }
-function createConnectionByList(strList,mode){
+function createConnectionByList(strList,mode=1){
     //与えられた接続先リストを確認し、未接続な相手があれば接続を試みる
     // mode=0:通常、1:IDが自分より大きい相手のみ、2:小さい相手のみ
     let ans =0;
@@ -447,16 +480,19 @@ function createConnectionByList(strList,mode){
                         flg=0;
                 }
                 if (flg!=0){
-                    addNewPeer(tgtId);
+                    addNewPeer(tgtId,0);
                     ans++;
                 }
             }
         }}}
     }
     
+    if(ans!=0){
+        console.log("debug : createConnectionByList Mode"+String(mode)+" finish "+String(ans)+"."+(mode==2 ? "[Warning]delay!":"")  );
+    }
     if (mode==1){
         if(flg2!=0){
-            setTimeout( createConnectionByList(strList,2) ,1000);
+            setTimeout( function(){createConnectionByList(strList,2)} ,1000 );
         }
     }
     return ans;
@@ -483,6 +519,7 @@ function checkRecievedDataStatus(remoteId,data){
             break;
         case "CL": // ConnectionList 接続先一覧
         case "CL2": // 再送信要求付
+            console.log("debug : recieve ConnectionList ["+stts+"] from "+remoteId+"."  );
             createConnectionByList(data2,1);
             if(stts=="CL2") {
                 allSendListConnection(); //新規入室者を全メンバーに通知
@@ -490,7 +527,7 @@ function checkRecievedDataStatus(remoteId,data){
             }
             break;
         default:
-            console.log("["+remoteId+"]より不正なデータ("+stts+")を受診 : " + data);
+            console.log("Warning(debug):["+remoteId+"]より不正なデータ("+stts+")を受診 : " + data);
             break;
       }
   }}
@@ -507,9 +544,9 @@ function createNewPeerSettingCall(callConnection){
    connectedCalls[callConnection.remoteId] = callConnection;
    
    // 通信相手一覧のHTML-Domを設置する
-   if(!(document.getElementById('div_peerid-'+callConnection.remoteId))){
-      domAppendOrRemoveforPeer(1,callConnection.remoteId); //Dom生成
-   }
+   //if(!(document.getElementById('div_peerid-'+callConnection.remoteId))){
+   //   domAppendOrRemoveforPeer(1,callConnection.remoteId); //Dom生成
+   //}
    
    if(callConnection._options.payload){
        // 自分の映像ストリームを相手に渡す
@@ -570,6 +607,11 @@ function createNewPeerSettingCall(callConnection){
                 }
             }
             
+            
+            //録音に通知
+            if(mediaRecorder!==null){
+                recreateAudioOutputStream();
+            }
             
           }
       });
@@ -994,7 +1036,7 @@ function startVideo(triggerElem = null) {
         
         let newDestination=null;
         //マイクからの音量に増幅を掛ける（新しいストリームを新規に作成）
-        if (audioTrack!=null) {
+        if (audioTrack!==null) {
             const micSource = c_audioContext.createMediaStreamSource(stream);
             newDestination = c_audioContext.createMediaStreamDestination();
             micSource.connect(c_gainNode);
@@ -1004,18 +1046,18 @@ function startVideo(triggerElem = null) {
         //新規に作成した音声ストリームに、映像ストリームを付加
         localStream = null;
         if(soundOnlyFlg){
-            if(newDestination==null){
+            if(newDestination===null){
                   localStream = stream;
             }else{
                   localStream = newDestination.stream;
             }
         }else{
-            if(newDestination==null){
-                if (videoTrack!=null) {
+            if(newDestination===null){
+                if (videoTrack!==null) {
                     localStream = stream;
                 }
             }else{
-                if (videoTrack!=null) {
+                if (videoTrack!==null) {
                     newDestination.stream.addTrack(videoTrack);
                     localStream = newDestination.stream;
                 }else{
@@ -1049,7 +1091,7 @@ function startVideo(triggerElem = null) {
         
         
         
-        if(localStream != null){
+        if(localStream !== null){
             
             //ストリーム保存
             //const mediaRecorder = new MediaRecorder(localStream);
@@ -1065,7 +1107,10 @@ function startVideo(triggerElem = null) {
                 }
             }
             
-            
+            //録音に通知
+            if(mediaRecorder!==null){
+                recreateAudioOutputStream();
+            }
         }
 
         

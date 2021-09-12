@@ -371,15 +371,14 @@ function myOnload(){
      elemRec_SW.addEventListener('click', function(e){
          e.target.setAttribute("disabled", true);
          if(e.target.value!=0){
-             e.target.value=0;
-             e.target.innerText = "REC開始";
-             
              audioRecCommand(0);//停止
+                 e.target.value=0;
+                 e.target.innerText = "REC開始";
          }else{
-             e.target.value=1;
-             e.target.innerText = "REC終了";
-             
-             audioRecCommand(1);//開始
+             if(0!=audioRecCommand(1)){    //開始
+                 e.target.value=1;
+                 e.target.innerText = "REC終了";
+             }
          }
          e.target.removeAttribute("disabled");
      });
