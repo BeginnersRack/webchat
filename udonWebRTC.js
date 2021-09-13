@@ -354,10 +354,16 @@ function startMultiparty(){
       }
   }}
   
+  // 接続の初期化(ON)
+  // toggleElemStream_SW();
+  
 }
+
+
 // 新しい接続先に此方から接続に行った場合。 利用者の操作からの処理である場合 actionFlg=1
 function addNewPeer(newPeerID,actionFlg=1){
   if(SkyWayPeer){
+    forceOnElemStream_SW();
     
     // 相手と通話を開始して、自分のストリームを渡す
     sendStreamToPeer(newPeerID);
@@ -394,6 +400,8 @@ function createNewPeerSettingData(dataConnection,directionFlg=0,actionFlg=0){
     //新規の通信相手を設定する(data)  dataConnection.remoteId は相手のPeerID
     // directionFlg=1:こちらからの接続要求。0：向こうからの接続要求
     console.log("debug : createNewPeerSettingData() "+(directionFlg==1 ? "to ":directionFlg==0 ? "from ":"??? ")+dataConnection.remoteId+"."  );
+
+    forceOnElemStream_SW();
 
      if (dataConnection.remoteId in connectedDatas) {
          console.log("Warning (debug): コネクションojb上書き発生 ["+dataConnection.remoteId+"]."  );
@@ -635,7 +643,7 @@ function deletePeerFromCallList(tgtPeerID){
       let call = connectedCalls[tgtPeerID];
       
       //切断
-      if(call) call.close();
+      if(call) call.close(true);
       
       //接続先リストから削除する
       delete connectedCalls[tgtPeerID];
@@ -655,7 +663,7 @@ function deletePeerFromDataList(tgtPeerID){
       let conn = connectedDatas[tgtPeerID];
 
       //切断
-      if(conn) conn.close();
+      if(conn) conn.close(true);
       
       //接続先リストから削除する
       delete connectedDatas[tgtPeerID];
@@ -1137,7 +1145,7 @@ function startVideo(triggerElem = null) {
               if(conn.open) {
                   //conn.replaceStream(localStream);
                   //flg=1;
-                  conn.close();
+                  conn.close(true);
               }
            }
            if(flg==0){
@@ -1244,6 +1252,25 @@ function CheckEnable_videoTrack(triggerElem = null , loop=0){
     }
 }
 
+function forceOnElemStream_SW(){
+    if(elemStream_SW.value==0){
+        toggleElemStream_SW();
+    }
+}
+function toggleElemStream_SW(){  // 接続の初期化（ON/OFF）
+
+         if(elemStream_SW.value!=0){
+             elemStream_SW.value=0;
+             elemStream_SW.innerText = "通信再開";
+             dispInfoStreamStatus();
+         }else{
+             elemStream_SW.value=1;
+             elemStream_SW.innerText = "通信停止";
+             dispInfoStreamStatus();
+         }
+         
+         initVideoConstraints(elemStream_SW);
+}
 function initVideoConstraints(triggerElem = null){  // ストリームのon/off制御
    let flg=0;
    

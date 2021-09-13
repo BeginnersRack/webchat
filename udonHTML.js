@@ -242,18 +242,8 @@ function myOnload(){
    //elemStream_SW_Msg =  document.getElementById('my-stream_sw_message');
    if(elemStream_SW){
      elemStream_SW.addEventListener('click', function(e){
-         e.target.setAttribute("disabled", true);
-         if(e.target.value!=0){
-             e.target.value=0;
-             e.target.innerText = "通信再開";
-             dispInfoStreamStatus();
-         }else{
-             e.target.value=1;
-             e.target.innerText = "通信停止";
-             dispInfoStreamStatus();
-         }
-         
-         initVideoConstraints(elemStream_SW);
+         elemStream_SW.setAttribute("disabled", true);
+         toggleElemStream_SW();
      });
    }
 
