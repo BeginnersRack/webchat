@@ -9,6 +9,7 @@ let mediaRecorder_micVolumeGain;
 let SkyWayPeer;
 let connectedCalls={};  // 接続したコールを保存しておく連想配列変数
 let connectedDatas={};  // 接続したchatデータコネクトを保存しておく連想配列変数
+let connectedDatasModifyFlg=0;
 let audioContextCtrls={};  // ボリュームゲイン等のコントロール用
 
 let videoConstraints = null;
@@ -272,8 +273,9 @@ window.addEventListener(terminationEvent, function(event) {
         tgttime.setSeconds( tgttime.getSeconds() + 30);
         
         while (intCnt>0) {
-            intCnt = Object.keys(connectedDatas).length;
-            
+            if(connectedDatasModifyFlg!=0) { intCnt=1; }
+            else{intCnt = Object.keys(connectedDatas).length;}
+
             let nowtime = new Date();
             if(nowtime>tgttime) intCnt=0;
         }
@@ -656,7 +658,7 @@ function deletePeerFromCallList(tgtPeerID){
    
 }
 function deletePeerFromDataList(tgtPeerID){
-   
+   connectedDatasModifyFlg=1;
    if ((tgtPeerID in connectedDatas) == true) {
       
       // 切断時に利用するため保存しておいた コールオブジェクト
@@ -674,7 +676,7 @@ function deletePeerFromDataList(tgtPeerID){
    if ((tgtPeerID in connectedCalls) != true) {
       domAppendOrRemoveforPeer(0,tgtPeerID);
    }
-   
+   connectedDatasModifyFlg=0;
 }
 
 
